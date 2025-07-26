@@ -133,9 +133,118 @@ static int tslua_add_language_from_object(lua_State *L)
   return add_language(L, false);
 }
 
+typedef const TSLanguage *(*parser_proc_t)(void);
+
+typedef struct {
+  parser_proc_t proc;
+  const char *langname;
+} ParserEntry;
+
+// clang-format off
+extern const TSLanguage* tree_sitter_c                     (void);
+extern const TSLanguage* tree_sitter_cpp                   (void);
+extern const TSLanguage* tree_sitter_bash                  (void);
+extern const TSLanguage* tree_sitter_regex                 (void);
+extern const TSLanguage* tree_sitter_java                  (void);
+extern const TSLanguage* tree_sitter_css                   (void);
+extern const TSLanguage* tree_sitter_typescript            (void);
+extern const TSLanguage* tree_sitter_html                  (void);
+extern const TSLanguage* tree_sitter_python                (void);
+extern const TSLanguage* tree_sitter_json                  (void);
+extern const TSLanguage* tree_sitter_go                    (void);
+extern const TSLanguage* tree_sitter_javascript            (void);
+extern const TSLanguage* tree_sitter_c_sharp               (void);
+extern const TSLanguage* tree_sitter_rust                  (void);
+extern const TSLanguage* tree_sitter_printf                (void);
+extern const TSLanguage* tree_sitter_toml                  (void);
+extern const TSLanguage* tree_sitter_yaml                  (void);
+extern const TSLanguage* tree_sitter_zig                   (void);
+extern const TSLanguage* tree_sitter_odin                  (void);
+extern const TSLanguage* tree_sitter_glsl                  (void);
+extern const TSLanguage* tree_sitter_hlsl                  (void);
+extern const TSLanguage* tree_sitter_make                  (void);
+extern const TSLanguage* tree_sitter_lua                   (void);
+extern const TSLanguage* tree_sitter_vim                   (void);
+extern const TSLanguage* tree_sitter_diff                  (void);
+extern const TSLanguage* tree_sitter_asm                   (void);
+extern const TSLanguage* tree_sitter_godot_resource        (void);
+extern const TSLanguage* tree_sitter_gdscript              (void);
+extern const TSLanguage* tree_sitter_disassembly           (void);
+extern const TSLanguage* tree_sitter_slint                 (void);
+extern const TSLanguage* tree_sitter_qmljs                 (void);
+extern const TSLanguage* tree_sitter_nix                   (void);
+extern const TSLanguage* tree_sitter_nim                   (void);
+extern const TSLanguage* tree_sitter_nasm                  (void);
+extern const TSLanguage* tree_sitter_haskell               (void);
+extern const TSLanguage* tree_sitter_vimdoc                (void);
+extern const TSLanguage* tree_sitter_query                 (void);
+
+const ParserEntry parser_entries[] = {
+  (ParserEntry){ .proc = tree_sitter_c             ,           .langname = "c"                },
+  (ParserEntry){ .proc = tree_sitter_cpp           ,           .langname = "cpp"              },
+  (ParserEntry){ .proc = tree_sitter_bash          ,           .langname = "bash"             },
+  (ParserEntry){ .proc = tree_sitter_regex         ,           .langname = "regex"            },
+  (ParserEntry){ .proc = tree_sitter_java          ,           .langname = "java"             },
+  (ParserEntry){ .proc = tree_sitter_css           ,           .langname = "css"              },
+  (ParserEntry){ .proc = tree_sitter_typescript    ,           .langname = "typescript"       },
+  (ParserEntry){ .proc = tree_sitter_html          ,           .langname = "html"             },
+  (ParserEntry){ .proc = tree_sitter_python        ,           .langname = "python"           },
+  (ParserEntry){ .proc = tree_sitter_json          ,           .langname = "json"             },
+  (ParserEntry){ .proc = tree_sitter_go            ,           .langname = "go"               },
+  (ParserEntry){ .proc = tree_sitter_javascript    ,           .langname = "javascript"       },
+  (ParserEntry){ .proc = tree_sitter_c_sharp       ,           .langname = "c_sharp"          },
+  (ParserEntry){ .proc = tree_sitter_rust          ,           .langname = "rust"             },
+  (ParserEntry){ .proc = tree_sitter_printf        ,           .langname = "printf"           },
+  (ParserEntry){ .proc = tree_sitter_toml          ,           .langname = "toml"             },
+  (ParserEntry){ .proc = tree_sitter_yaml          ,           .langname = "yaml"             },
+  (ParserEntry){ .proc = tree_sitter_zig           ,           .langname = "zig"              },
+  (ParserEntry){ .proc = tree_sitter_odin          ,           .langname = "odin"             },
+  (ParserEntry){ .proc = tree_sitter_glsl          ,           .langname = "glsl"             },
+  (ParserEntry){ .proc = tree_sitter_hlsl          ,           .langname = "hlsl"             },
+  (ParserEntry){ .proc = tree_sitter_make          ,           .langname = "make"             },
+  (ParserEntry){ .proc = tree_sitter_lua           ,           .langname = "lua"              },
+  (ParserEntry){ .proc = tree_sitter_vim           ,           .langname = "vim"              },
+  (ParserEntry){ .proc = tree_sitter_diff          ,           .langname = "diff"             },
+  (ParserEntry){ .proc = tree_sitter_asm           ,           .langname = "asm"              },
+  (ParserEntry){ .proc = tree_sitter_godot_resource,           .langname = "godot_resource"   },
+  (ParserEntry){ .proc = tree_sitter_gdscript      ,           .langname = "gdscript"         },
+  (ParserEntry){ .proc = tree_sitter_disassembly   ,           .langname = "disassembly"      },
+  (ParserEntry){ .proc = tree_sitter_slint         ,           .langname = "slint"            },
+  (ParserEntry){ .proc = tree_sitter_qmljs         ,           .langname = "qmljs"            },
+  (ParserEntry){ .proc = tree_sitter_nix           ,           .langname = "nix"              },
+  (ParserEntry){ .proc = tree_sitter_nim           ,           .langname = "nim"              },
+  (ParserEntry){ .proc = tree_sitter_nasm          ,           .langname = "nasm"             },
+  (ParserEntry){ .proc = tree_sitter_haskell       ,           .langname = "haskell"          },
+  (ParserEntry){ .proc = tree_sitter_vimdoc        ,           .langname = "vimdoc"           },
+  (ParserEntry){ .proc = tree_sitter_query         ,           .langname = "query"            },
+};
+// clang-format on
+
+static const TSLanguage *(*get_statically_linked_parser_proc_for_language(const char *langname))(void) 
+{
+  const size_t num_langs = sizeof(parser_entries) / sizeof(ParserEntry);
+  for (size_t i = 0; i < num_langs; ++i) {
+    const ParserEntry *pe = &parser_entries[i];
+    if (strncmp(langname, pe->langname, strlen(pe->langname)) == 0) {
+      return pe->proc;
+    }
+  }
+
+  return NULL;
+}
+
 static const TSLanguage *load_language_from_object(lua_State *L, const char *path,
                                                    const char *lang_name, const char *symbol)
 {
+  // check if the language was compiled into neovim before trying dlopen
+  parser_proc_t proc = get_statically_linked_parser_proc_for_language(lang_name);
+  if (proc != NULL) {
+    const TSLanguage *lang = proc();
+    if (lang != NULL) {
+      return lang;
+    }
+  }
+
   uv_lib_t lib;
   if (uv_dlopen(path, &lib)) {
     xstrlcpy(IObuff, uv_dlerror(&lib), sizeof(IObuff));

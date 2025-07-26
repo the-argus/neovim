@@ -320,6 +320,72 @@ pub fn build(b: *std.Build) !void {
     const nvim_exe_step = b.step("nvim_bin", "only the binary (not a fully working install!)");
     const nvim_exe_install = b.addInstallArtifact(nvim_exe, .{});
 
+    const Grammar = struct {
+        name: []const u8,
+        subdir: ?[]const u8 = null,
+        scanner: bool = true,
+    };
+    const grammars = &[_]Grammar{
+        .{ .name = "treesitter_c", .scanner = false },
+        .{ .name = "treesitter_cpp" },
+        .{ .name = "treesitter_bash" },
+        .{ .name = "treesitter_regex", .scanner = false },
+        .{ .name = "treesitter_java", .scanner = false },
+        .{ .name = "treesitter_css" },
+        .{ .name = "treesitter_typescript", .subdir = "typescript" },
+        .{ .name = "treesitter_html" },
+        .{ .name = "treesitter_python" },
+        .{ .name = "treesitter_json", .scanner = false },
+        .{ .name = "treesitter_go", .scanner = false },
+        .{ .name = "treesitter_javascript" },
+        .{ .name = "treesitter_c_sharp" },
+        .{ .name = "treesitter_rust" },
+        .{ .name = "treesitter_printf", .scanner = false },
+        .{ .name = "treesitter_toml" },
+        .{ .name = "treesitter_yaml" },
+        .{ .name = "treesitter_zig", .scanner = false },
+        .{ .name = "treesitter_odin" },
+        .{ .name = "treesitter_glsl", .scanner = false },
+        .{ .name = "treesitter_hlsl" },
+        .{ .name = "treesitter_make", .scanner = false },
+        // markdown included manually
+        .{ .name = "treesitter_lua" },
+        .{ .name = "treesitter_vim" },
+        .{ .name = "treesitter_diff", .scanner = false },
+        .{ .name = "treesitter_asm", .scanner = false },
+        .{ .name = "treesitter_godot_resource" },
+        .{ .name = "treesitter_gdscript" },
+        .{ .name = "treesitter_disassembly" },
+        .{ .name = "treesitter_slint", .scanner = false },
+        .{ .name = "treesitter_qmljs" },
+        .{ .name = "treesitter_nix" },
+        .{ .name = "treesitter_nim" },
+        .{ .name = "treesitter_vimdoc", .scanner = false },
+        .{ .name = "treesitter_query", .scanner = false },
+        .{ .name = "treesitter_nasm", .scanner = false },
+        .{ .name = "treesitter_haskell" },
+    };
+
+    for (grammars) |grammar| {
+        const dep = b.dependency(grammar.name, .{ .target = target, .optimize = optimize });
+        const offset = ("treesitter_").len;
+        const path = block: {
+            if (grammar.subdir) |subdir| {
+                break :block dep.path(subdir);
+            }
+            break :block dep.path(".");
+        };
+        const parsername = grammar.name[offset..];
+        const lib = add_ts_parser_static(b, parsername, path, grammar.scanner, target, optimize);
+        nvim_exe.linkLibrary(lib);
+    }
+
+    const markdown = b.dependency("treesitter_markdown", .{ .target = target, .optimize = optimize });
+    const md_parser = add_ts_parser_static(b, "markdown", markdown.path("tree-sitter-markdown/"), true, target, optimize);
+    const md_inline_parser = add_ts_parser_static(b, "markdown_inline", markdown.path("tree-sitter-markdown-inline/"), true, target, optimize);
+    nvim_exe.linkLibrary(md_parser);
+    nvim_exe.linkLibrary(md_inline_parser);
+
     nvim_exe_step.dependOn(&nvim_exe_install.step);
 
     const gen_runtime = try runtime.nvim_gen_runtime(b, nlua0, nvim_exe, funcs_data);
@@ -379,6 +445,30 @@ pub fn test_fixture(
     fixture.linkLibC();
     if (libuv) |uv| fixture.linkLibrary(uv);
     return &b.addInstallArtifact(fixture, .{}).step;
+}
+
+pub fn add_ts_parser_static(
+    b: *std.Build,
+    name: []const u8,
+    parser_dir: LazyPath,
+    scanner: bool,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const parser: *std.Build.Step.Compile = b.addLibrary(.{
+        .name = name,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+        .linkage = .static,
+    });
+    parser.addCSourceFile(.{ .file = parser_dir.path(b, "src/parser.c") });
+    if (scanner) parser.addCSourceFile(.{ .file = parser_dir.path(b, "src/scanner.c") });
+    parser.addIncludePath(parser_dir.path(b, "src"));
+    parser.linkLibC();
+
+    return parser;
 }
 
 pub fn add_ts_parser(
