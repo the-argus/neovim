@@ -129,9 +129,11 @@ function M.add(lang, opts)
     local fname = 'parser/' .. lang .. '.*'
     local paths = api.nvim_get_runtime_file(fname, false)
     if #paths == 0 then
-      return nil, string.format('No parser for language "%s"', lang)
+      -- return nil, string.format('No parser for language "%s"', lang)
+      path = "dummy" -- let loading still happen, parser is probably static
+    else
+      path = paths[1]
     end
-    path = paths[1]
   end
 
   local res = loadparser(path, lang, symbol_name)
